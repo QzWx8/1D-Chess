@@ -1,6 +1,16 @@
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from tkinter import *
+
+
+def keep_the_board(func):
+    def wrapper(self, *args, **kwargs):
+        board_copy = [square if square is None else type(square)(square.cords, square.color) for square in self.board]
+        self.move_piece(kwargs['cord1'], kwargs['cord2'])
+        result = func(self, *args)
+        self.move_piece(kwargs['cord2'], kwargs['cord1'])
+        self.board = board_copy
+        return result
+    return wrapper
 
 class Game:
     def __init__(self):
@@ -40,45 +50,59 @@ class Game:
                                square_size * 0.6, fill='light green'))
         self.selected = (moves, cord)
 
-    def possible_moves(self, moves, piece):
+    def possible_moves(self, moves, piece, need_to_check=True):
         res = []
         for move in moves:
             if not isinstance(self.board[move], Piece) or self.board[move].color != piece.color:
-                res.append(move)
+                if need_to_check:
+                    if not self.check(self.move, cord1=piece.cords, cord2=move):
+                        res.append(move)
+                else:
+                    res.append(move)
         return res
 
-    def second_click(self, evt, moves, cord1, draw_check=False):
+    def move_piece(self, cord1, cord2):
+        self.board[cord1].cords = cord2
+        self.board[cord1], self.board[cord2] = None, self.board[cord1]
+        #self.draw_piece()
+
+    def second_click(self, evt, moves, cord1):
         for circle in self.circles:
             canvas.delete(circle)
         self.circles = []
         cord2 = self.cord(evt)
         if cord2 in moves:
-            self.board[cord1].cords = cord2
-            self.board[cord1], self.board[cord2] = None, self.board[cord1]
+            self.move_piece(cord1, cord2)
+            self.move = 'white' if self.move == 'black' else 'black'
             self.draw_piece()
-            if not draw_check:
-                print('is checking draw')
-                self.move = 'white' if self.move == 'black' else 'black'
-                self.draw()
-
         self.selected = None
         self.end_of_the_game()
 
-    def check(self):
+    '''def move_piece(self, func, *args, **kwargs):
+        board_copy = [square if square is None else type(square)(square.cords, square.color) for square in self.board]
+        self.second_click(kwargs['evt'], kwargs['moves'], kwargs['cord1'])
+        res = func(*args)
+        self.board = board_copy
+        self.draw_piece()
+        return res'''
+
+    @keep_the_board
+    def check(self, color):
         king_cords = None
         for i in range(8):
-            if isinstance(self.board[i], King) and self.board[i].color == self.move:
+            if isinstance(self.board[i], King) and self.board[i].color == color:
                 king_cords = i
                 break
         for square in self.board:
-            if isinstance(square, Piece) and square.color != self.move:
-                if king_cords in self.possible_moves(square.get_moves(self.board), square):
+            if isinstance(square, Piece) and square.color != color:
+                #if king_cords in self.possible_moves(square.get_moves(self.board), square, False):
+                if king_cords in square.get_moves(self.board):
                     break
         else:
             return False
         return True
 
-    def draw(self):
+    '''def draw(self):
         king_cords = None
         board_copy = [square if square is None else type(square)(square.cords, square.color) for square in self.board]
         print(*((type(i), i.cords) for i in board_copy if isinstance(i, Piece)), 'first print')
@@ -100,19 +124,31 @@ class Game:
                             if king_cords in self.possible_moves(square.get_moves(self.board), square):
                                 break
                     else:
-                        return False
+                        self.board = board_copy
+                        self.draw_piece()
+                        #return False
         print(*((type(i), i.cords) for i in board_copy if isinstance(i, Piece)))
         self.board = board_copy
-
+        print('self.board', *((type(i), i.cords) for i in self.board if isinstance(i, Piece)))
+        self.draw_piece()
         print('draw')
-        return True
+        #self.end_of_the_game(True)
+        #return True'''
 
-
-    def end_of_the_game(self):
+    def end_of_the_game(self, draw=False):
+        if draw:
+            tk.destroy()
+            print('DRAW')
         kings = []
+        others = False
         for square in self.board:
             if isinstance(square, King):
                 kings.append(square.color)
+            elif square is not None:
+                others = True
+        if not others:
+            tk.destroy()
+            print("DRAW")
         if len(kings) == 1:
             tk.destroy()
             if 'white' not in kings:
@@ -186,9 +222,7 @@ for x in range(8):
     canvas.create_text(square_size * (x + 0.8), square_size * 0.8, text=chr(ord('a') + x))
 canvas.pack()
 
-'''rep = type(King(0, 'white'))(1, 'black')
-print(f'rep parameters: cords - {rep.cords}; color - {rep.color}')'''
-
 game = Game()
 
 canvas.mainloop()
+#хыыыыы 228
