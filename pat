@@ -4,7 +4,7 @@ from tkinter import *
 
 def keep_the_board(func):
     def wrapper(self, *args, **kwargs):
-        board_copy = [square if square is None else type(square)(square.cords, square.color) for square in self.board]
+        board_copy = [square for square in self.board]
         self.move_piece(kwargs['cord1'], kwargs['cord2'])
         result = func(self, *args)
         self.move_piece(kwargs['cord2'], kwargs['cord1'])
@@ -50,14 +50,11 @@ class Game:
                                square_size * 0.6, fill='light green'))
         self.selected = (moves, cord)
 
-    def possible_moves(self, moves, piece, need_to_check=True):
+    def possible_moves(self, moves, piece):
         res = []
         for move in moves:
             if not isinstance(self.board[move], Piece) or self.board[move].color != piece.color:
-                if need_to_check:
-                    if not self.check(self.move, cord1=piece.cords, cord2=move):
-                        res.append(move)
-                else:
+                if not self.check(self.move, cord1=piece.cords, cord2=move):
                     res.append(move)
         return res
 
@@ -71,6 +68,9 @@ class Game:
             canvas.delete(circle)
         self.circles = []
         cord2 = self.cord(evt)
+        if isinstance(self.board[cord2], Piece) and self.board[cord2].color == self.move:
+            self.first_click(evt)
+            return
         if cord2 in moves:
             self.move_piece(cord1, cord2)
             self.move = 'white' if self.move == 'black' else 'black'
@@ -225,4 +225,3 @@ canvas.pack()
 game = Game()
 
 canvas.mainloop()
-#хыыыыы 228
