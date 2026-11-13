@@ -71,7 +71,7 @@ class Game:
             self.move_piece(cord1, cord2)
             self.move = ~self.move
             self.draw_piece()
-            if all(self.draw(piece) for piece in self.board
+            if all(self.has_no_move(piece) for piece in self.board
                     if isinstance(piece, Piece) and piece.color == self.move):
                 if self.check(self.move):
                     state = f'checkmate\n{~self.move} won'
@@ -99,7 +99,7 @@ class Game:
             return False
         return True
 
-    def draw(self, piece):
+    def has_no_move(self, piece):
         return self.possible_moves(piece.get_moves(self.board), piece) == []
 
 class Color(Enum):
