@@ -1,14 +1,15 @@
 from abc import ABC, abstractmethod
+from enum import Enum
 from tkinter import *
 
 class Game:
     def __init__(self):
-        self.board = [King(0, 'white'), Knight(1, 'white'), Rook(2, 'white'),
+        self.board = [King(0, Color.WHITE), Knight(1, Color.WHITE), Rook(2, Color.WHITE),
                                                             None, None,
-                      Rook(5, 'black'), Knight(6, 'black'), King(7, 'black')]
-        self.move = 'white'
+                      Rook(5, Color.BLACK), Knight(6, Color.BLACK), King(7, Color.BLACK)]
+        self.move = Color.WHITE
         self.circles, self.pieces = [], []
-        self.cord = lambda evt: evt.x // square_size
+        self.cord = lambda evt: evt if type(evt) == int else evt.x // square_size
         self.draw_piece()
         self.selected = None
         canvas.bind("<Button-1>", self.on_click)
@@ -26,7 +27,7 @@ class Game:
         for square in self.board:
             if isinstance(square, Piece):
                 self.pieces.append(canvas.create_text(square_size * (square.cords + 0.5), square_size / 2, text=square.shape,
-                                   font=('Times New Roman', square_size // 2), fill=square.color))
+                                   font=('Times New Roman', square_size // 2), fill=str(square.color)))
 
     def first_click(self, evt):
         cord = self.cord(evt)
@@ -43,46 +44,89 @@ class Game:
         res = []
         for move in moves:
             if not isinstance(self.board[move], Piece) or self.board[move].color != piece.color:
-                res.append(move)
+                board_copy = [square for square in self.board]
+                piece_cords = piece.cords
+                self.move_piece(piece_cords, move)
+                in_check = self.check(piece.color)
+                self.move_piece(move, piece_cords)
+                self.board = board_copy
+                if not in_check:
+                    res.append(move)
         return res
 
+    def move_piece(self, cord1, cord2):
+        self.board[cord1].cords = cord2
+        self.board[cord1], self.board[cord2] = None, self.board[cord1]
+
     def second_click(self, evt, moves, cord1):
+        state = None
         for circle in self.circles:
             canvas.delete(circle)
         self.circles = []
         cord2 = self.cord(evt)
+        if isinstance(self.board[cord2], Piece) and self.board[cord2].color == self.move:
+            self.first_click(evt)
+            return
         if cord2 in moves:
-            self.board[cord1].cords = cord2
-            self.board[cord1], self.board[cord2] = None, self.board[cord1]
-            self.move = 'white' if self.move == 'black' else 'black'
+            self.move_piece(cord1, cord2)
+            self.move = ~self.move
             self.draw_piece()
-        self.selected = None
-        self.end_of_the_game()
+            if all(self.draw(piece) for piece in self.board
+                    if isinstance(piece, Piece) and piece.color == self.move):
+                if self.check(self.move):
+                    state = f'checkmate\n{~self.move} won'
+                else:
+                    state = 'draw'
 
-    def end_of_the_game(self):
-        kings = []
+        self.selected = None
+        if state:
+            canvas.delete(ALL)
+            canvas.create_text(square_size * 4, square_size // 2, text=state,
+                               font=('Times New Roman', square_size // 3), fill='light green')
+            tk.after(1_000, tk.destroy)
+
+    def check(self, color):
+        king_cords = None
+        for i in range(8):
+            if isinstance(self.board[i], King) and self.board[i].color == color:
+                king_cords = i
+                break
         for square in self.board:
-            if isinstance(square, King):
-                kings.append(square.color)
-        if len(kings) == 1:
-            tk.destroy()
-            if 'white' not in kings:
-                print('BLACK WON')
-            else:
-                print('WHITE WON')
+            if isinstance(square, Piece) and square.color != color:
+                if king_cords in square.get_moves(self.board):
+                    break
+        else:
+            return False
+        return True
+
+    def draw(self, piece):
+        return self.possible_moves(piece.get_moves(self.board), piece) == []
+
+class Color(Enum):
+    WHITE = 'white'
+    BLACK = 'black'
+
+    def __invert__(self):
+        return Color.BLACK if self is Color.WHITE else Color.WHITE
+
+    def __str__(self):
+        return 'black' if self is Color.BLACK else 'white'
 
 class Piece(ABC):
-    def __init__(self, shape, cords, color):
+    def __init__(self, shape, cords, color: Color):
         self.shape = shape
         self.color = color
         self.cords = cords
+
+    def __str__(self):
+        return self.shape
 
     @abstractmethod
     def get_moves(self, board) -> list[int]:
         pass
 
 class King(Piece):
-    def __init__(self, cords, color):
+    def __init__(self, cords, color: Color):
         super().__init__('♚', cords, color)
 
     def get_moves(self, board) -> list[int]:
@@ -94,7 +138,7 @@ class King(Piece):
         return moves
 
 class Knight(Piece):
-    def __init__(self, cords, color):
+    def __init__(self, cords, color: Color):
         super().__init__('♞', cords, color)
 
     def get_moves(self, board) -> list[int]:
@@ -106,7 +150,7 @@ class Knight(Piece):
         return moves
 
 class Rook(Piece):
-    def __init__(self, cords, color):
+    def __init__(self, cords, color: Color):
         super().__init__('♜', cords, color)
 
     def get_moves(self, board) -> list[int]:
@@ -130,7 +174,7 @@ tk.resizable(False, False)
 tk.wm_protocol("WM_DELETE_WINDOW", tk.destroy)
 
 square_size = 80
-canvas = Canvas(tk, width=square_size * 8, height=square_size)
+canvas = Canvas(tk, width=square_size * 8, height=square_size, bg='grey22')
 for x in range(8):
     canvas.create_rectangle(x * square_size, 0, (x + 1) * square_size, square_size,
                             fill='brown' if x % 2 else 'grey22')
